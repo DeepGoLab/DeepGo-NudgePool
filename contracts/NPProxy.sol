@@ -16,17 +16,15 @@ contract NPProxy is Ownable {
     }
 
     mapping(string => LogicContracts) internal versions;
+    LogicContracts public currentVersions;
+    LogicContracts public delayVersions;
     string[] public versionList;
     string public version;
-    address public _IPC;
-    address public _GPDC;
-    address public _GPWC;
-    address public _LPC;
-    address public _VTC;
-    address public _STC;
-    address public _LQDC;
+    uint256 constant delayTime = 30 seconds;
+    uint256 public startTime;
+    bool public initialized;
 
-    function upgrade(
+    function setUpgrade(
         string memory _newVersion,
         address _ipc,
         address _gpdc,
@@ -43,22 +41,40 @@ contract NPProxy is Ownable {
                 _lqdc != address(0), "Wrong Address");
         require(bytes(_newVersion).length > 0, "Empty Version");
         version = _newVersion;
-        _IPC = _ipc;
-        _GPDC = _gpdc;
-        _GPWC = _gpwc;
-        _LPC = _lpc;
-        _VTC = _vtc;
-        _STC = _stc;
-        _LQDC = _lqdc;
-        versions[version].ipc = _ipc;
-        versions[version].gpdc = _gpdc;
-        versions[version].gpwc = _gpwc;
-        versions[version].lpc = _lpc;
-        versions[version].vtc = _vtc;
-        versions[version].stc = _stc;
-        versions[version].lqdc = _lqdc;
+        delayVersions.ipc = _ipc;
+        delayVersions.gpdc = _gpdc;
+        delayVersions.gpwc = _gpwc;
+        delayVersions.lpc = _lpc;
+        delayVersions.vtc = _vtc;
+        delayVersions.stc = _stc;
+        delayVersions.lqdc = _lqdc;
+        startTime = block.timestamp;
+    }
+
+    function executeUpgrade(
+        string memory _newVersion
+    )
+        public onlyOwner
+    {
+        if(initialized == true){
+            require(block.timestamp > startTime + delayTime, "Operation In Delay" );
+        }
+        require(delayVersions.ipc != address(0) && delayVersions.gpdc != address(0) && delayVersions.gpwc != address(0) &&
+        delayVersions.lpc != address(0) && delayVersions.vtc != address(0) && delayVersions.stc != address(0) &&
+        delayVersions.lqdc != address(0), "Wrong Address");
+        require(keccak256(abi.encodePacked(_newVersion)) == keccak256(abi.encodePacked(version)), "Version Not Match");
+        versions[version] = delayVersions;
+        currentVersions = delayVersions;
         versionList.push(_newVersion);
-}
+        delete delayVersions;
+    }
+
+    function rollback(
+    )
+        public onlyOwner
+    {
+        delete delayVersions;
+    }
 
     function getLogicContracts(
         string calldata _version

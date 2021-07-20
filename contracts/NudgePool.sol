@@ -12,7 +12,6 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     using BytesUtils for bytes;
     using SafeMath for uint256;
 
-    bool public initialized;
     constructor(
         address _DGTToken,
         address _DGTBeneficiary,
@@ -22,12 +21,17 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         address _vts
     )
     {
-        require(_DGTToken != address(0) && _DGTBeneficiary != address(0) &&
-                _ips != address(0) && _gps != address(0) &&
-                _lps != address(0) && _vts != address(0), "Invalid Address");
-
         DGTToken = _DGTToken;
         DGTBeneficiary = _DGTBeneficiary;
+
+        minRatio = uint32(RATIO_FACTOR * 5 / 1000000);
+        alpha = 0;
+        raiseRatio = uint32(RATIO_FACTOR * 1);
+
+        auctionDuration = 7 days;
+        raisingDuration = 3 days;
+        minimumDuration = 90 days;
+
         _IPS = IPStorage(_ips);
         _GPS = GPStorage(_gps);
         _LPS = LPStorage(_lps);
@@ -46,7 +50,8 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external onlyOwner
     {
         require(!initialized, "Already Initialized");
-        upgrade("0.0.1", _ipc, _gpdc, _gpwc, _lpc, _vtc, _stc, _lqdc);
+        setUpgrade("0.0.1", _ipc, _gpdc, _gpwc, _lpc, _vtc, _stc, _lqdc);
+        executeUpgrade("0.0.1");
         initialized = true;
     }
 
@@ -64,7 +69,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _IPC.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
+        (bool status,) = currentVersions.ipc.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
             "createPool(address,address,address,uint256,uint256,uint32,uint32,uint32,uint256)")),
             _ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount,
             _ipImpawnRatio, _ipCloseLine, _chargeRatio, _duration));
@@ -80,7 +85,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _IPC.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
+        (bool status,) = currentVersions.ipc.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
             "auctionPool(address,address,address,uint256,uint256)")),
             _ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount));
         require(status == true, "Auction Pool Failed");
@@ -96,7 +101,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _IPC.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
+        (bool status,) = currentVersions.ipc.delegatecall(abi.encodeWithSelector(bytes4(keccak256(
             "changePoolParam(address,address,uint32,uint32,uint32,uint256)")),
             _ipToken, _baseToken, _ipImpawnRatio,
             _ipCloseLine, _chargeRatio, _duration));
@@ -111,7 +116,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _IPC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.ipc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "IPDepositRunning(address,address,uint256)")),
             _ipToken, _baseToken, _ipTokensAmount));
@@ -129,7 +134,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _GPDC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.gpdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "GPDepositRaising(address,address,uint256,bool)")),
             _ipToken, _baseToken, _baseTokensAmount, _create));
@@ -147,7 +152,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _GPDC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.gpdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "GPDepositRunning(address,address,uint256,bool)")),
             _ipToken, _baseToken, _baseTokensAmount, _create));
@@ -162,7 +167,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _GPDC.delegatecall(
+        (bool status,) = currentVersions.gpdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "GPDoDepositRunning(address,address)")), _ipToken, _baseToken));
         require(status == true, "GP Do Deposit Failed");
@@ -176,7 +181,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _GPWC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.gpwc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "GPWithdrawRunning(address,address,uint256)")),
             _ipToken, _baseToken, _baseTokensAmount));
@@ -194,7 +199,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _LPC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lpc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "LPDepositRaising(address,address,uint256,bool)")),
             _ipToken, _baseToken, _baseTokensAmount, _create));
@@ -212,7 +217,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _LPC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lpc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "LPDepositRunning(address,address,uint256,bool)")),
             _ipToken, _baseToken, _baseTokensAmount, _create));
@@ -227,7 +232,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _LPC.delegatecall(
+        (bool status,) = currentVersions.lpc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "LPDoDepositRunning(address,address)")), _ipToken, _baseToken));
         require(status == true, "LP Do Deposit Failed");
@@ -242,7 +247,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _LPC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lpc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "LPWithdrawRunning(address,address,uint256,bool)")),
             _ipToken, _baseToken, _baseTokensAmount, _vaultOnly));
@@ -258,7 +263,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (bool)
     {
-        (bool status, bytes memory data) = _STC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.stc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "checkAuctionEnd(address,address)")), _ipToken, _baseToken));
         require(status == true, "Check Failed");
@@ -272,7 +277,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (bool)
     {
-        (bool status, bytes memory data) = _STC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.stc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "checkRaisingEnd(address,address)")), _ipToken, _baseToken));
         require(status == true, "Check Failed");
@@ -286,7 +291,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (bool)
     {
-        (bool status, bytes memory data) = _LQDC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lqdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "checkRunningEnd(address,address)")), _ipToken, _baseToken));
         require(status == true, "Check Failed");
@@ -300,7 +305,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (bool)
     {
-        (bool status, bytes memory data) = _LQDC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lqdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "checkIPLiquidation(address,address)")), _ipToken, _baseToken));
         require(status == true, "Check Failed");
@@ -314,7 +319,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (bool)
     {
-        (bool status, bytes memory data) = _LQDC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.lqdc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "checkGPLiquidation(address,address)")), _ipToken, _baseToken));
         require(status == true, "Check Failed");
@@ -327,7 +332,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     )
         external
     {
-        (bool status,) = _VTC.delegatecall(
+        (bool status,) = currentVersions.vtc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "computeVaultReward(address,address)")), _ipToken, _baseToken));
         require(status == true, "Compute Reward Failed");
@@ -341,7 +346,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external
         returns (uint256 amount)
     {
-        (bool status, bytes memory data) = _VTC.delegatecall(
+        (bool status, bytes memory data) = currentVersions.vtc.delegatecall(
             abi.encodeWithSelector(bytes4(keccak256(
             "withdrawVault(address,address,uint256)")),
             _ipToken, _baseToken, _baseTokensAmount));
