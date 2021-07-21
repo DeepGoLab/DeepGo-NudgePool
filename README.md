@@ -13,6 +13,7 @@ npm install --save-dev chai @types/node @types/mocha @types/chai
 npm install --save-dev mocha
 npm install --save-dev dotenv
 npm install --save-dev hardhat-preprocessor
+npm install --save-dev hardhat-contract-sizer
 npm install --save-dev solidity-coverage
 npm install --save-dev @uniswap/v2-core
 npm install --save-dev @uniswap/v2-periphery

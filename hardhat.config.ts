@@ -1,5 +1,6 @@
 import "dotenv/config"
 import "@nomiclabs/hardhat-waffle"
+import "hardhat-contract-sizer"
 
 import { HardhatUserConfig } from "hardhat/types"
 
@@ -41,6 +42,11 @@ const config: HardhatUserConfig = {
         runs: 200
       }
     }
+  },
+  contractSizer: {
+    alphaSort: true,
+    runOnCompile: true,
+    disambiguatePaths: false,
   },
 }
 
