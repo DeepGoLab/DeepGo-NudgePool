@@ -3,9 +3,13 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./lib/SafeMath.sol";
 
 contract NPProxy is Ownable {
+    using SafeMath for uint256;
+
     struct LogicContracts {
+        bool valid;
         address ipc;
         address gpdc;
         address gpwc;
@@ -16,17 +20,16 @@ contract NPProxy is Ownable {
     }
 
     mapping(string => LogicContracts) internal versions;
+    LogicContracts public curVersion;
+    LogicContracts public delayVersion;
     string[] public versionList;
-    string public version;
-    address public _IPC;
-    address public _GPDC;
-    address public _GPWC;
-    address public _LPC;
-    address public _VTC;
-    address public _STC;
-    address public _LQDC;
+    string public versionName;
+    string public delayVersionName;
+    uint256 constant delayTime = 5 minutes;
+    uint256 public startTime;
+    bool public initialized;
 
-    function upgrade(
+    function setUpgrade(
         string memory _newVersion,
         address _ipc,
         address _gpdc,
@@ -42,23 +45,43 @@ contract NPProxy is Ownable {
                 _lpc != address(0) && _vtc != address(0) && _stc != address(0) &&
                 _lqdc != address(0), "Wrong Address");
         require(bytes(_newVersion).length > 0, "Empty Version");
-        version = _newVersion;
-        _IPC = _ipc;
-        _GPDC = _gpdc;
-        _GPWC = _gpwc;
-        _LPC = _lpc;
-        _VTC = _vtc;
-        _STC = _stc;
-        _LQDC = _lqdc;
-        versions[version].ipc = _ipc;
-        versions[version].gpdc = _gpdc;
-        versions[version].gpwc = _gpwc;
-        versions[version].lpc = _lpc;
-        versions[version].vtc = _vtc;
-        versions[version].stc = _stc;
-        versions[version].lqdc = _lqdc;
+        delayVersionName = _newVersion;
+        delayVersion.ipc = _ipc;
+        delayVersion.gpdc = _gpdc;
+        delayVersion.gpwc = _gpwc;
+        delayVersion.lpc = _lpc;
+        delayVersion.vtc = _vtc;
+        delayVersion.stc = _stc;
+        delayVersion.lqdc = _lqdc;
+        delayVersion.valid = true;
+        startTime = block.timestamp;
+    }
+
+    function executeUpgrade(
+        string memory _newVersion
+    )
+        public onlyOwner
+    {
+        require(delayVersion.valid == true, "Upgrade Invalid");
+        if (initialized == true) {
+            require(block.timestamp > startTime.add(delayTime), "In Delay" );
+        }
+        require(keccak256(abi.encodePacked(_newVersion)) == keccak256(abi.encodePacked(delayVersionName)), "Version Incorrect");
+        versions[delayVersionName] = delayVersion;
+        versionName = delayVersionName;
+        curVersion = delayVersion;
         versionList.push(_newVersion);
-}
+        delayVersionName = '';
+        delete delayVersion;
+    }
+
+    function rollback(
+    )
+        public onlyOwner
+    {
+        delayVersionName = '';
+        delete delayVersion;
+    }
 
     function getLogicContracts(
         string calldata _version
