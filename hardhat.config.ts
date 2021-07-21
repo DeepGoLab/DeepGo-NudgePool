@@ -1,5 +1,7 @@
 import "dotenv/config"
 import "@nomiclabs/hardhat-waffle"
+import "@nomiclabs/hardhat-ethers";
+import "hardhat-deploy"
 import "hardhat-contract-sizer"
 
 import { HardhatUserConfig } from "hardhat/types"
@@ -33,6 +35,23 @@ const config: HardhatUserConfig = {
       gasPrice: 5000000000,
       gasMultiplier: 2,
     },
+  },
+  namedAccounts: {
+    deployer: {
+      default: 0,
+    },
+    dev: {
+      default: 1,
+    },
+  },
+  paths: {
+    artifacts: "artifacts",
+    cache: "cache",
+    deploy: "deploy",
+    deployments: "deployments",
+    imports: "imports",
+    sources: "contracts",
+    tests: "test",
   },
   solidity: {
     version: "0.8.4",

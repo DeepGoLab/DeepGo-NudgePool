@@ -1,6 +1,7 @@
 #Hardhat files
 artifacts
 cache
+deployments
 node_modules
 package-lock.json
 .env
