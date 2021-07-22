@@ -7,7 +7,7 @@ import "hardhat-contract-sizer"
 import { HardhatUserConfig } from "hardhat/types"
 
 const accounts = {
-  mnemonic: process.env.MNEMONIC || "test test test test test test test test test test test go",
+  mnemonic: process.env.MNEMONIC || "test test test test test test test test test test test junk",
 }
 
 const config: HardhatUserConfig = {
@@ -30,7 +30,13 @@ const config: HardhatUserConfig = {
     },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${process.env.INFURA_API_KEY}`,
-      accounts,
+      accounts: [`${process.env.OWNER_PRIVATE_KEY}`,
+        `${process.env.IP1_PRIVATE_KEY}`,
+        `${process.env.IP2_PRIVATE_KEY}`,
+        `${process.env.GP1_PRIVATE_KEY}`,
+        `${process.env.GP2_PRIVATE_KEY}`,
+        `${process.env.LP1_PRIVATE_KEY}`,
+        `${process.env.LP2_PRIVATE_KEY}`],
       chainId: 4,
       gasPrice: 5000000000,
       gasMultiplier: 2,
@@ -67,6 +73,9 @@ const config: HardhatUserConfig = {
     runOnCompile: true,
     disambiguatePaths: false,
   },
+  mocha: {
+    timeout: 18000000
+  }
 }
 
 export default config
