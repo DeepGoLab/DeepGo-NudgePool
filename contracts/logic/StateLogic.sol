@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/SafeMath.sol";
 import "../lib/NPSwap.sol";
 import "./BaseLogic.sol";
@@ -73,10 +74,11 @@ contract StateLogic is BaseLogic {
     )
         private
     {
-        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_baseToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, inUnit);
         uint256 IPStake = _IPS.getIPTokensAmount(_ipToken, _baseToken);
         uint32 impawnRatio = _IPS.getIPImpawnRatio(_ipToken, _baseToken);
-        uint256 initAmount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(1 ether).div(price);
+        uint256 initAmount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(inUnit).div(price);
 
         _IPS.setPoolInitPrice(_ipToken, _baseToken, price);
         _IPS.setIPInitCanRaise(_ipToken, _baseToken, initAmount);
@@ -90,15 +92,16 @@ contract StateLogic is BaseLogic {
         private
         returns (uint256 maxAmount)
     {
-        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_baseToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, inUnit);
         uint256 IPStake = _IPS.getIPTokensAmount(_ipToken, _baseToken);
         uint256 initPrice = _IPS.getPoolInitPrice(_ipToken, _baseToken);
         uint32 impawnRatio = _IPS.getIPImpawnRatio(_ipToken, _baseToken);
         // part 1
-        uint256 amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(price.sqrt()).div(initPrice.sqrt()).mul(1 ether).div(initPrice);
+        uint256 amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(price.sqrt()).div(initPrice.sqrt()).mul(inUnit).div(initPrice);
         maxAmount = amount;
         // part2
-        amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(alpha).div(RATIO_FACTOR).mul(1 ether).div(initPrice);
+        amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(alpha).div(RATIO_FACTOR).mul(inUnit).div(initPrice);
         amount = amount.mul(price).div(initPrice);
         maxAmount = maxAmount.add(amount);
 

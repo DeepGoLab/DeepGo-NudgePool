@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/SafeMath.sol";
 import "../lib/NPSwap.sol";
 import "./BaseLogic.sol";
@@ -127,10 +128,11 @@ contract LPLogic is BaseLogic {
         private
         returns (uint256 lend)
     {
-        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 IPAmount = _GPS.getCurIPAmount(_ipToken, _baseToken);
         uint256 raiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
-        uint256 balance = IPAmount.mul(price).div(1 ether);
+        uint256 balance = IPAmount.mul(price).div(inUnit);
 
         if (raiseLP >= balance ||
             balance.mul(RATIO_FACTOR).div(balance.sub(raiseLP)) >=
@@ -188,11 +190,12 @@ contract LPLogic is BaseLogic {
         private
         returns (uint256 amount)
     {
-        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 IPAmount = _GPS.getCurIPAmount(_ipToken, _baseToken);
         uint256 LPAmount = _LPS.getCurLPAmount(_ipToken, _baseToken);
         uint256 curRaiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
-        uint256 balance = IPAmount.mul(price).div(1 ether);
+        uint256 balance = IPAmount.mul(price).div(inUnit);
         uint256 expect;
 
         if (curRaiseLP >= balance ||
@@ -210,7 +213,7 @@ contract LPLogic is BaseLogic {
             return amount;
         }
 
-        uint256 swappedIP = expect.mul(1 ether).div(price);
+        uint256 swappedIP = expect.mul(inUnit).div(price);
         uint256 real = NPSwap.swap(_ipToken, _baseToken, swappedIP);
         _GPS.setCurIPAmount(_ipToken, _baseToken, IPAmount.sub(swappedIP));
         _GPS.setCurRaiseLPAmount(_ipToken, _baseToken, curRaiseLP.sub(expect));

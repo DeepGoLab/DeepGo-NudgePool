@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/SafeMath.sol";
 import "../lib/NPSwap.sol";
 import "./BaseLogic.sol";
@@ -20,12 +21,13 @@ contract LiquidationLogic is BaseLogic {
         returns (bool)
     {
         poolAtStage(_ipToken, _baseToken, Stages.RUNNING);
-        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 IPAmount = _IPS.getIPTokensAmount(_ipToken, _baseToken);
         uint32 closeLine = _IPS.getIPCloseLine(_ipToken, _baseToken);
         uint256 GPAmount = _GPS.getCurGPAmount(_ipToken, _baseToken);
 
-        if (IPAmount.mul(price).div(1 ether).mul(closeLine) <= GPAmount.mul(RATIO_FACTOR)) {
+        if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= GPAmount.mul(RATIO_FACTOR)) {
             doIPLiquidation(_ipToken, _baseToken, price);
             return true;
         }
@@ -42,11 +44,12 @@ contract LiquidationLogic is BaseLogic {
         returns (bool)
     {
         poolAtStage(_ipToken, _baseToken, Stages.RUNNING);
-        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 IPAmount = _GPS.getCurIPAmount(_ipToken, _baseToken);
         uint256 raiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
 
-        if (IPAmount.mul(price).div(1 ether) <= raiseLP) {
+        if (IPAmount.mul(price).div(inUnit) <= raiseLP) {
             doGPLiquidation(_ipToken, _baseToken, price);
             return true;
         }
@@ -90,7 +93,8 @@ contract LiquidationLogic is BaseLogic {
         uint256 belongGP = 0;
 
         IPAmount = IPAmount.add(IPStake);
-        swappedIP = raiseLP.div(price).mul(1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        swappedIP = raiseLP.div(price).mul(inUnit);
         swappedIP = swappedIP > IPAmount ? IPAmount : swappedIP;
         if (swappedIP > 0) {
             belongLP = NPSwap.swap(_ipToken, _baseToken, swappedIP);

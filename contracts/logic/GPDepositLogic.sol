@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/SafeMath.sol";
 import "../lib/NPSwap.sol";
 import "./BaseLogic.sol";
@@ -116,15 +117,16 @@ contract GPDepositLogic is BaseLogic {
         private
         returns (uint256 maxAmount)
     {
-        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_baseToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_baseToken, _ipToken, inUnit);
         uint256 IPStake = _IPS.getIPTokensAmount(_ipToken, _baseToken);
         uint256 initPrice = _IPS.getPoolInitPrice(_ipToken, _baseToken);
         uint32 impawnRatio = _IPS.getIPImpawnRatio(_ipToken, _baseToken);
         // part 1
-        uint256 amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(price.sqrt()).div(initPrice.sqrt()).mul(1 ether).div(initPrice);
+        uint256 amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(price.sqrt()).div(initPrice.sqrt()).mul(inUnit).div(initPrice);
         maxAmount = amount;
         // part2
-        amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(alpha).div(RATIO_FACTOR).mul(1 ether).div(initPrice);
+        amount = IPStake.mul(impawnRatio).div(RATIO_FACTOR).mul(alpha).div(RATIO_FACTOR).mul(inUnit).div(initPrice);
         amount = amount.mul(price).div(initPrice);
         maxAmount = maxAmount.add(amount);
 
@@ -179,11 +181,11 @@ contract GPDepositLogic is BaseLogic {
             // No GP in this pool before, return directly.
             return;
         }
-
-        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, 1 ether);
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 len = _GPS.getGPArrayLength(_ipToken, _baseToken);
         // If sub fail, the pool should do GP liquidation.
-        uint256 balance = IPAmount.mul(price).div(1 ether).sub(_GPS.getCurRaiseLPAmount(_ipToken, _baseToken));
+        uint256 balance = IPAmount.mul(price).div(inUnit).sub(_GPS.getCurRaiseLPAmount(_ipToken, _baseToken));
 
         _GPS.setCurGPBalance(_ipToken, _baseToken, balance);
         for (uint256 i = 0; i < len; i++) {
