@@ -28,6 +28,12 @@ contract NPProxy is Ownable {
     uint256 public startTime;
     bool public initialized;
 
+    event SetUpgrade(string version, address IPlogic, address GPDepositLogic, address GPWithdrawLogic,
+                    address LPLogic, address VaultLogic, address StateLogic, address LiquidationLogic);
+    event ExecuteUpgrade(string version, address IPlogic, address GPDepositLogic, address GPWithdrawLogic,
+                    address LPLogic, address VaultLogic, address StateLogic, address LiquidationLogic);
+    event Rollback();
+
     function setUpgrade(
         string memory _newVersion,
         address _ipc,
@@ -53,6 +59,7 @@ contract NPProxy is Ownable {
         delayVersion.stc = _stc;
         delayVersion.lqdc = _lqdc;
         startTime = block.timestamp;
+        emit SetUpgrade(_newVersion, _ipc, _gpdc, _gpwc, _lpc, _vtc, _stc, _lqdc);
     }
 
     function executeUpgrade(
@@ -71,6 +78,8 @@ contract NPProxy is Ownable {
         versionList.push(delayVersionName);
         delayVersionName = '';
         delete delayVersion;
+        emit ExecuteUpgrade(versionName, curVersion.ipc, curVersion.gpdc, curVersion.gpwc, curVersion.lpc,
+                            curVersion.vtc, curVersion.stc, curVersion.lqdc);
     }
 
     function rollback(
@@ -79,6 +88,7 @@ contract NPProxy is Ownable {
     {
         delayVersionName = '';
         delete delayVersion;
+        emit Rollback();
     }
 
     function getLogicContracts(

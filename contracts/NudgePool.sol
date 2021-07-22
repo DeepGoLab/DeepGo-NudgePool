@@ -12,6 +12,22 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
     using BytesUtils for bytes;
     using SafeMath for uint256;
 
+    event CreatePool(address _ip, address _ipToken, address _baseToken, uint256 _ipTokensAmount, uint256 _dgtTokensAmount,
+                        uint32 _ipImpawnRatio, uint32 _ipCloseLine,uint32 _chargeRatio, uint256 _duration);
+    event AuctionPool(address _ip, address _ipToken, address _baseToken, uint256 _ipTokensAmount, uint256 _dgtTokensAmount);
+    event ChangePoolParam(address _ipToken, address _baseToken, uint32 _ipImpawnRatio, uint32 _ipCloseLine,
+                   uint32 _chargeRatio, uint256 _duration);
+    event RunningIPDeposit(address _ipToken, address _baseToken, uint256 _ipTokensAmount);
+    event RaisingGPDeposit( address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event RunningGPDeposit( address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event RunningGPDoDeposit(address _ipToken, address _baseToken);
+    event RunningGPWithdraw(address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event RaisingLPDeposit(address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event RunningLPDeposit(address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event RunningLPDoDeposit(address _ipToken, address _baseToken);
+    event RunningLPWithdraw(address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+    event WithdrawVault(address _ipToken, address _baseToken, uint256 _baseTokensAmount);
+
     constructor(
         address _DGTToken,
         address _DGTBeneficiary,
@@ -55,6 +71,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external onlyOwner
     {
         _pause();
+        emit Paused(msg.sender);
     }
 
     function unPause(
@@ -62,6 +79,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         external onlyOwner
     {
         _unpause();
+        emit Unpaused(msg.sender);
     }
 
     function createPool(
@@ -82,6 +100,8 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount,
             _ipImpawnRatio, _ipCloseLine, _chargeRatio, _duration));
         require(status == true, "Create Pool Failed");
+        emit CreatePool(_ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount,
+                        _ipImpawnRatio, _ipCloseLine, _chargeRatio, _duration);
     }
 
     function auctionPool(
@@ -97,6 +117,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             "auctionPool(address,address,address,uint256,uint256)")),
             _ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount));
         require(status == true, "Auction Pool Failed");
+        emit AuctionPool(_ip, _ipToken, _baseToken, _ipTokensAmount, _dgtTokensAmount);
     }
 
     function changePoolParam(
@@ -114,6 +135,8 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _ipImpawnRatio,
             _ipCloseLine, _chargeRatio, _duration));
         require(status == true, "Change Pool Param Failed");
+        emit ChangePoolParam(_ipToken, _baseToken, _ipImpawnRatio, _ipCloseLine,
+                            _chargeRatio, _duration);
     }
 
     function IPDepositRunning(
@@ -130,6 +153,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _ipTokensAmount));
         require(status == true, "IP Deposit Failed");
         amount = data.bytesToUint256();
+        emit RunningIPDeposit(_ipToken, _baseToken, _ipTokensAmount);
         return amount;
     }
 
@@ -148,6 +172,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount, _create));
         require(status == true, "GP Deposit Failed");
         amount = data.bytesToUint256();
+        emit RaisingGPDeposit(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -166,6 +191,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount, _create));
         require(status == true, "GP Deposit Failed");
         amount = data.bytesToUint256();
+        emit RunningGPDeposit(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -179,6 +205,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             abi.encodeWithSelector(bytes4(keccak256(
             "GPDoDepositRunning(address,address)")), _ipToken, _baseToken));
         require(status == true, "GP Do Deposit Failed");
+        emit RunningGPDoDeposit(_ipToken, _baseToken);
     }
 
     function GPWithdrawRunning(
@@ -195,6 +222,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount));
         require(status == true, "GP Withdraw Failed");
         amount = data.bytesToUint256();
+        emit RunningGPWithdraw(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -213,6 +241,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount, _create));
         require(status == true, "LP Deposit Failed");
         amount = data.bytesToUint256();
+        emit RaisingLPDeposit(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -231,6 +260,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount, _create));
         require(status == true, "LP Deposit Failed");
         amount = data.bytesToUint256();
+        emit RunningLPDeposit(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -244,6 +274,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             abi.encodeWithSelector(bytes4(keccak256(
             "LPDoDepositRunning(address,address)")), _ipToken, _baseToken));
         require(status == true, "LP Do Deposit Failed");
+        emit RunningLPDoDeposit(_ipToken, _baseToken);
     }
 
     function LPWithdrawRunning(
@@ -261,6 +292,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount, _vaultOnly));
         require(status == true, "LP Withdraw Failed");
         amount = data.bytesToUint256();
+        emit RunningLPWithdraw(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 
@@ -360,6 +392,7 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
             _ipToken, _baseToken, _baseTokensAmount));
         require(status == true, "Withdraw Vault Failed");
         amount = data.bytesToUint256();
+        emit WithdrawVault(_ipToken, _baseToken, _baseTokensAmount);
         return amount;
     }
 }
