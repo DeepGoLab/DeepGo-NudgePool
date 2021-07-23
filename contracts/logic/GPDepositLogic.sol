@@ -186,13 +186,16 @@ contract GPDepositLogic is BaseLogic {
         uint256 len = _GPS.getGPArrayLength(_ipToken, _baseToken);
         // If sub fail, the pool should do GP liquidation.
         uint256 balance = IPAmount.mul(price).div(inUnit).sub(_GPS.getCurRaiseLPAmount(_ipToken, _baseToken));
+        uint256 resBalance = balance;
 
         _GPS.setCurGPBalance(_ipToken, _baseToken, balance);
         for (uint256 i = 0; i < len; i++) {
             address gp = _GPS.getGPByIndex(_ipToken, _baseToken, i);
             uint256 amount = _GPS.getGPHoldIPAmount(_ipToken, _baseToken, gp);
-            _GPS.setGPBaseBalance(_ipToken, _baseToken, gp,
-                                  amount.mul(balance).div(IPAmount));
+            uint256 curBalance = amount.mul(balance).div(IPAmount);
+            resBalance -= curBalance;
+            curBalance = i == len - 1 ? curBalance.add(resBalance) : curBalance;
+            _GPS.setGPBaseBalance(_ipToken, _baseToken, gp, curBalance);
         }
     }
 

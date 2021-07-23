@@ -18,6 +18,31 @@ contract VaultLogic is BaseLogic {
         lockPool(_ipToken, _baseToken)
     {
         poolAtStage(_ipToken, _baseToken, Stages.RUNNING);
+        uint256 vault = getVaultReward(_ipToken, _baseToken);
+        uint256 len = _LPS.getLPArrayLength(_ipToken, _baseToken);
+        uint256 LPAmount = _LPS.getCurLPAmount(_ipToken, _baseToken);
+        uint256 resVault = vault;
+
+        for (uint256 i = 0; i < len; i++) {
+            address lp = _LPS.getLPByIndex(_ipToken, _baseToken, i);
+            uint256 reward = _LPS.getLPVaultReward(_ipToken, _baseToken, lp);
+            uint256 amount = _LPS.getLPBaseAmount(_ipToken, _baseToken, lp);
+            //reuse local varible
+            uint256 curVault = vault.mul(amount).div(LPAmount);
+            resVault -= curVault;
+            curVault = i == len - 1 ? curVault.add(resVault) : curVault;
+            reward = reward.add(curVault);
+            _LPS.setLPVaultReward(_ipToken, _baseToken, lp, reward);
+        }
+    }
+
+    function getVaultReward(
+        address _ipToken,
+        address _baseToken
+    )
+        internal
+        returns (uint256 vault)
+    {
         uint256 lastTime = _VTS.getLastUpdateTime(_ipToken, _baseToken);
         uint256 endTime = _IPS.getPoolAuctionEndTime(_ipToken, _baseToken).add(
                           _IPS.getIPDuration(_ipToken, _baseToken));
@@ -25,20 +50,9 @@ contract VaultLogic is BaseLogic {
         
         require(block.timestamp > lastTime && block.timestamp < endTime,
                 "Timestamp Incorrect");
-        uint256 vault = curVault.mul(block.timestamp.sub(lastTime)).div(
-                        endTime.sub(lastTime));
+        vault = curVault.mul(block.timestamp.sub(lastTime)).div(endTime.sub(lastTime));
         _VTS.setCurVault(_ipToken, _baseToken, curVault.sub(vault));
         _VTS.setLastUpdateTime(_ipToken, _baseToken, block.timestamp);
-
-        uint256 len = _LPS.getLPArrayLength(_ipToken, _baseToken);
-        uint256 LPAmount = _LPS.getCurLPAmount(_ipToken, _baseToken);
-        for (uint256 i = 0; i < len; i++) {
-            address lp = _LPS.getLPByIndex(_ipToken, _baseToken, i);
-            uint256 reward = _LPS.getLPVaultReward(_ipToken, _baseToken, lp);
-            uint256 amount = _LPS.getLPBaseAmount(_ipToken, _baseToken, lp);
-            reward = reward.add(vault.mul(amount).div(LPAmount));
-            _LPS.setLPVaultReward(_ipToken, _baseToken, lp, reward);
-        }
     }
 
     function withdrawVault(

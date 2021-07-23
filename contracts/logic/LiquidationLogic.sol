@@ -169,12 +169,17 @@ contract LiquidationLogic is BaseLogic {
         uint256 curVault = _VTS.getCurVault(_ipToken, _baseToken);
         uint256 len = _LPS.getLPArrayLength(_ipToken, _baseToken);
         uint256 LPAmount = _LPS.getCurLPAmount(_ipToken, _baseToken);
+        uint resVault = curVault;
 
         for (uint256 i = 0; i < len; i++) {
             address lp = _LPS.getLPByIndex(_ipToken, _baseToken, i);
             uint256 reward = _LPS.getLPVaultReward(_ipToken, _baseToken, lp);
             uint256 amount = _LPS.getLPBaseAmount(_ipToken, _baseToken, lp);
-            reward = reward.add(curVault.mul(amount).div(LPAmount));
+
+            uint256 tmpVault = curVault.mul(amount).div(LPAmount);
+            resVault -= tmpVault;
+            tmpVault = i == len - 1 ? tmpVault.add(resVault) : tmpVault;
+            reward = reward.add(tmpVault);
             _LPS.setLPVaultReward(_ipToken, _baseToken, lp, reward);
         }
 
@@ -194,13 +199,17 @@ contract LiquidationLogic is BaseLogic {
     {
         uint256 len = _LPS.getLPArrayLength(_ipToken, _baseToken);
         uint256 LPAmount = _LPS.getCurLPAmount(_ipToken, _baseToken);
+        uint256 resAmount = _amount;
 
         for (uint256 i = len; i > 0; i--) {
             address lp = _LPS.getLPByIndex(_ipToken, _baseToken, i - 1);
             uint256 reward = _LPS.getLPVaultReward(_ipToken, _baseToken, lp);
             uint256 amount = _LPS.getLPBaseAmount(_ipToken, _baseToken, lp);
-            uint256 belongLP = reward.add(_amount.mul(amount).div(LPAmount));
 
+            uint256 curAmount = _amount.mul(amount).div(LPAmount);
+            resAmount -= curAmount;
+            curAmount = i == 1 ? curAmount.add(resAmount) : curAmount;
+            uint256 belongLP = reward.add(curAmount);
             IERC20(_baseToken).safeTransfer(lp, belongLP);
             _LPS.deleteLP(_ipToken, _baseToken, lp);
         }
@@ -219,6 +228,7 @@ contract LiquidationLogic is BaseLogic {
     {
         uint256 len = _GPS.getGPArrayLength(_ipToken, _baseToken);
         uint256 GPBalance = _GPS.getCurGPBalance(_ipToken, _baseToken);
+        uint256 resAmount = _amount;
 
         for (uint256 i = len; i > 0; i--) {
             address gp = _GPS.getGPByIndex(_ipToken, _baseToken, i - 1);
@@ -226,6 +236,8 @@ contract LiquidationLogic is BaseLogic {
             if (_amount > 0) {
                 uint256 balance = _GPS.getGPBaseBalance(_ipToken, _baseToken, gp);
                 uint256 belongGP = _amount.mul(balance).div(GPBalance);
+                resAmount -= belongGP;
+                belongGP = i == 1? belongGP.add(resAmount) : belongGP;
 
                 if (_base) {
                     IERC20(_baseToken).safeTransfer(gp, belongGP);

@@ -171,6 +171,7 @@ contract StateLogic is BaseLogic {
         }
 
         uint256 resAmount = maxAmount;
+
         for (uint256 i = 0; i < len; i++) {
             address gp = helpArr[i].gp;
             uint256 expectAmount = resAmount.mul(helpArr[i].weight).div(totalWeight);
@@ -183,7 +184,6 @@ contract StateLogic is BaseLogic {
                 _GPS.setGPBaseBalance(_ipToken, _baseToken, gp, expectAmount);
                 GPAmount = GPAmount.sub(retAmount);
             }
-
             resAmount = resAmount.sub(expectAmount);
             totalWeight = totalWeight.sub(helpArr[i].weight);
         }
@@ -238,15 +238,21 @@ contract StateLogic is BaseLogic {
         uint256 balance = _GPS.getCurGPBalance(_ipToken, _baseToken);
         uint256 IPAmount = _GPS.getCurIPAmount(_ipToken, _baseToken);
         uint256 raiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
+        uint256 resIPAmount = IPAmount;
+        uint256 resRaiseLP = raiseLP;
 
         for (uint256 i = 0; i < len; i++) {
             address gp = _GPS.getGPByIndex(_ipToken, _baseToken, i);
             uint256 gpBalance = _GPS.getGPBaseBalance(_ipToken, _baseToken, gp);
-            _GPS.setGPHoldIPAmount(_ipToken, _baseToken, gp,
-                                   gpBalance.mul(IPAmount).div(balance));
+            uint256 curAmount = gpBalance.mul(IPAmount).div(balance);
+            resIPAmount -= curAmount;
+            curAmount = i == len - 1 ? curAmount.add(resIPAmount) : curAmount;
+            _GPS.setGPHoldIPAmount(_ipToken, _baseToken, gp, curAmount);
 
-            _GPS.setGPRaiseLPAmount(_ipToken, _baseToken, gp,
-                                    gpBalance.mul(raiseLP).div(balance));
+            curAmount = gpBalance.mul(raiseLP).div(balance);
+            resRaiseLP -= curAmount;
+            curAmount = i == len - 1 ? curAmount.add(resRaiseLP) : curAmount;
+            _GPS.setGPRaiseLPAmount(_ipToken, _baseToken, gp, curAmount);
         }
     }
 }
