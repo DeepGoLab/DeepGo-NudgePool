@@ -116,21 +116,69 @@ contract StateLogic is BaseLogic {
     )
         private
     {
-        uint256 GPAmount = allocateGP(_ipToken, _baseToken);
-        // Transit to next stage when raised zero amount.
-        if (GPAmount == 0) {
+        uint256 inUnit = 10**ERC20(_ipToken).decimals();
+        uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
+        uint256 IPAmount = _IPS.getIPTokensAmount(_ipToken, _baseToken);
+        uint32 closeLine = _IPS.getIPCloseLine(_ipToken, _baseToken);
+        uint256 GPAmount = _GPS.getCurGPAmount(_ipToken, _baseToken);
+        uint256 IPStake = _IPS.getIPTokensAmount(_ipToken, _baseToken);
+        if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= GPAmount.mul(RATIO_FACTOR)) {
+            //Pently to IP
+            IERC20(_ipToken).safeTransfer(owner(), IPStake);
+            repayGPLP(_ipToken, _baseToken);
+        } else {
+            uint256 GPAmount = allocateGP(_ipToken, _baseToken);
+            // Transit to next stage when raised zero amount.
+            if (GPAmount == 0) {
+                poolTransitNextStage(_ipToken, _baseToken);
+                return;
+            }
+
+            uint256 fee = chargeVaultFee(_ipToken, _baseToken, GPAmount);
+            uint256 raiseLP = raiseFromLP(_ipToken, _baseToken, GPAmount.sub(fee));
+            uint256 swappedIP = NPSwap.swap(_baseToken, _ipToken,
+                                            GPAmount.add(raiseLP).sub(fee));
+            _GPS.setCurIPAmount(_ipToken, _baseToken, swappedIP);
+            allocateFunds(_ipToken, _baseToken);
             poolTransitNextStage(_ipToken, _baseToken);
-            return;
+        }
+    }
+
+    function repayGPLP(
+        address _ipToken,
+        address _baseToken
+    )
+        private
+    {
+        uint256 lenLP = _LPS.getLPArrayLength(_ipToken, _baseToken);
+        uint256 lenGP = _GPS.getGPArrayLength(_ipToken, _baseToken);
+
+        for (uint256 i = lenLP; i > 0; i--) {
+            address lp = _LPS.getLPByIndex(_ipToken, _baseToken, i - 1);
+            uint256 amountLP = _LPS.getLPBaseAmount(_ipToken, _baseToken, lp);
+            IERC20(_baseToken).safeTransfer(lp, amountLP);
+            _LPS.deleteLP(_ipToken, _baseToken, lp);
         }
 
-        uint256 fee = chargeVaultFee(_ipToken, _baseToken, GPAmount);
-        uint256 raiseLP = raiseFromLP(_ipToken, _baseToken, GPAmount.sub(fee));
-        uint256 swappedIP = NPSwap.swap(_baseToken, _ipToken,
-                                        GPAmount.add(raiseLP).sub(fee));
-        _GPS.setCurIPAmount(_ipToken, _baseToken, swappedIP);
-        allocateFunds(_ipToken, _baseToken);
-        poolTransitNextStage(_ipToken, _baseToken);
+        for (uint256 j = lenGP; j > 0; j--) {
+            address gp = _GPS.getGPByIndex(_ipToken, _baseToken, j - 1);
+            uint256 amountGP = _GPS.getGPBaseAmount(_ipToken, _baseToken, gp);
+            IERC20(_baseToken).safeTransfer(gp, amountGP);
+            _GPS.deleteGP(_ipToken, _baseToken, gp);
+        }
+
+        // Reset Pool LP Info
+        _LPS.setCurLPAmount(_ipToken, _baseToken, 0);
+        // Reset Pool GP Info
+        _GPS.setCurGPAmount(_ipToken, _baseToken, 0);
+        _GPS.setCurRaiseLPAmount(_ipToken, _baseToken, 0);
+        _GPS.setCurIPAmount(_ipToken, _baseToken, 0);
+        _GPS.setCurGPBalance(_ipToken, _baseToken, 0);
+        //Reset Pool Info
+        _IPS.setPoolStage(_ipToken, _baseToken, uint8(Stages.FINISHED));
+        _IPS.deletePool(_ipToken, _baseToken);
     }
+
 
     function allocateGP(
         address _ipToken,

@@ -99,13 +99,13 @@ contract LiquidationLogic is BaseLogic {
         if (swappedIP > 0) {
             belongLP = NPSwap.swap(_ipToken, _baseToken, swappedIP);
         }
-
         belongGP = IPAmount.sub(swappedIP);
         belongLP = belongLP.add(LPBase.sub(raiseLP));
         divideVault(_ipToken, _baseToken);
         repayLP(_ipToken, _baseToken, belongLP);
         repayGP(_ipToken, _baseToken, belongGP, false);
         repayIP(_ipToken, _baseToken, true);
+
     }
 
     function doGPLiquidation(
