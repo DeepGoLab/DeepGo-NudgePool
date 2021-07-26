@@ -28,7 +28,7 @@ contract LiquidationLogic is BaseLogic {
         uint256 GPAmount = _GPS.getCurGPAmount(_ipToken, _baseToken);
 
         if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= GPAmount.mul(RATIO_FACTOR)) {
-            doIPLiquidation(_ipToken, _baseToken, price);
+            doIPLiquidation(_ipToken, _baseToken);
             return true;
         }
 
@@ -50,7 +50,7 @@ contract LiquidationLogic is BaseLogic {
         uint256 raiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
 
         if (IPAmount.mul(price).div(inUnit) <= raiseLP) {
-            doGPLiquidation(_ipToken, _baseToken, price);
+            doGPLiquidation(_ipToken, _baseToken);
             return true;
         }
 
@@ -79,8 +79,7 @@ contract LiquidationLogic is BaseLogic {
 
     function doIPLiquidation(
         address _ipToken,
-        address _baseToken,
-        uint256 price
+        address _baseToken
     )
         private
     {
@@ -88,18 +87,16 @@ contract LiquidationLogic is BaseLogic {
         uint256 IPAmount = _GPS.getCurIPAmount(_ipToken, _baseToken);
         uint256 raiseLP = _GPS.getCurRaiseLPAmount(_ipToken, _baseToken);
         uint256 LPBase = _LPS.getCurLPAmount(_ipToken, _baseToken);
-        uint256 swappedIP = 0;
         uint256 belongLP = 0;
         uint256 belongGP = 0;
 
         IPAmount = IPAmount.add(IPStake);
-        uint256 inUnit = 10**ERC20(_ipToken).decimals();
-        swappedIP = raiseLP.div(price).mul(inUnit);
-        swappedIP = swappedIP > IPAmount ? IPAmount : swappedIP;
-        if (swappedIP > 0) {
-            belongLP = NPSwap.swap(_ipToken, _baseToken, swappedIP);
+        uint256 requireIP = NPSwap.getAmountIn(_ipToken, _baseToken, raiseLP);
+        requireIP = requireIP > IPAmount ? IPAmount : requireIP;
+        if (requireIP > 0) {
+            belongLP = NPSwap.swap(_ipToken, _baseToken, requireIP);
         }
-        belongGP = IPAmount.sub(swappedIP);
+        belongGP = IPAmount.sub(requireIP);
         belongLP = belongLP.add(LPBase.sub(raiseLP));
         divideVault(_ipToken, _baseToken);
         repayLP(_ipToken, _baseToken, belongLP);
@@ -110,8 +107,7 @@ contract LiquidationLogic is BaseLogic {
 
     function doGPLiquidation(
         address _ipToken,
-        address _baseToken,
-        uint256 price
+        address _baseToken
     )
         private
     {
