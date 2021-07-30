@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "../lib/Ownable.sol";
 import "./IPStorage.sol";
 import "./GPStorage.sol";
 import "./VaultStorage.sol";
