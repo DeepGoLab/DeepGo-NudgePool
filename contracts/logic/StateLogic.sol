@@ -120,14 +120,16 @@ contract StateLogic is BaseLogic {
         uint256 price = NPSwap.getAmountOut(_ipToken, _baseToken, inUnit);
         uint256 IPAmount = _IPS.getIPTokensAmount(_ipToken, _baseToken);
         uint32 closeLine = _IPS.getIPCloseLine(_ipToken, _baseToken);
+        uint256 maxAmount = _IPS.getIPMaxCanRaise(_ipToken, _baseToken);
         uint256 GPAmount = _GPS.getCurGPAmount(_ipToken, _baseToken);
         uint256 IPStake = _IPS.getIPTokensAmount(_ipToken, _baseToken);
-        if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= GPAmount.mul(RATIO_FACTOR)) {
+        maxAmount = maxAmount > GPAmount ? GPAmount : maxAmount;
+        if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= maxAmount.mul(RATIO_FACTOR)) {
             //Pently to IP
             IERC20(_ipToken).safeTransfer(owner(), IPStake);
             repayGPLP(_ipToken, _baseToken);
         } else {
-            uint256 GPAmount = allocateGP(_ipToken, _baseToken);
+            GPAmount = allocateGP(_ipToken, _baseToken);
             // Transit to next stage when raised zero amount.
             if (GPAmount == 0) {
                 poolTransitNextStage(_ipToken, _baseToken);
