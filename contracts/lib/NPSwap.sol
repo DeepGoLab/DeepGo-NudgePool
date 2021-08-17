@@ -122,8 +122,8 @@ library NPSwap {
         bytes32 initalCodeHashPancakeTest = hex'd0d4c4cd0848c93cb4fd1f498d7013ee6bfb25783ea21593d5834f5d250ece66';
 
         //Quickswap - Polygon
-        address routerQuick = address(0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32);
-        address factoryQuick = address(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
+        address routerQuick = address(0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff);
+        address factoryQuick = address(0x5757371414417b8C6CAad45bAeF941aBc7d3Ab32);
         bytes32 initalCodeHashQuick = hex'96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f';
 
         uint256 chainID = block.chainid;
