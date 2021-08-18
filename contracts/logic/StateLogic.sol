@@ -12,11 +12,6 @@ contract StateLogic is BaseLogic {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    struct GPAlloc {
-        address     gp;
-        uint256     weight;
-    }
-
     function checkAuctionEnd(
         address _ipToken,
         address _baseToken
@@ -127,7 +122,7 @@ contract StateLogic is BaseLogic {
         if (IPAmount.mul(price).div(inUnit).mul(closeLine) <= maxAmount.mul(RATIO_FACTOR)) {
             doRaisingLiquidation(_ipToken, _baseToken);
         } else {
-            GPAmount = allocateGP(_ipToken, _baseToken);
+            GPAmount = allocateGP(_ipToken, _baseToken, DGTToken);
             // Transit to next stage when raised zero amount.
             if (GPAmount == 0) {
                 poolTransitNextStage(_ipToken, _baseToken);
@@ -168,7 +163,8 @@ contract StateLogic is BaseLogic {
 
     function allocateGP(
         address _ipToken,
-        address _baseToken
+        address _baseToken,
+        address _dgtToken
     )
         private
         returns (uint256 amount)
@@ -181,49 +177,7 @@ contract StateLogic is BaseLogic {
             return amount;
         }
 
-        uint256 totalWeight = 0;
-        uint256 len = _GPS.getGPArrayLength(_ipToken, _baseToken);
-        GPAlloc[] memory helpArr = new GPAlloc[](len);
-        for (uint256 i = 0; i < len; i++) {
-            address gp = _GPS.getGPByIndex(_ipToken, _baseToken, i);
-            amount = _GPS.getGPBaseAmount(_ipToken, _baseToken, gp);
-            helpArr[i].gp = gp;
-            helpArr[i].weight = IERC20(DGTToken).balanceOf(gp).add(1 ether).mul(amount.sqrt());
-            totalWeight = totalWeight.add(helpArr[i].weight);
-
-            for (uint256 j = i; j != 0; j--) {
-                if (helpArr[j].weight > helpArr[j-1].weight) {
-                    GPAlloc memory tmp = GPAlloc(helpArr[j].gp, helpArr[j].weight);
-                    helpArr[j].gp = helpArr[j-1].gp;
-                    helpArr[j].weight = helpArr[j-1].weight;
-                    helpArr[j-1].gp = tmp.gp;
-                    helpArr[j-1].weight = tmp.weight;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        uint256 resAmount = maxAmount;
-
-        for (uint256 i = 0; i < len; i++) {
-            address gp = helpArr[i].gp;
-            uint256 expectAmount = resAmount.mul(helpArr[i].weight).div(totalWeight);
-            amount = _GPS.getGPBaseAmount(_ipToken, _baseToken, gp);
-            expectAmount = expectAmount > amount ? amount : expectAmount;
-            if (expectAmount < amount) {
-                uint256 retAmount = amount.sub(expectAmount);
-                IERC20(_baseToken).safeTransfer(gp, retAmount);
-                _GPS.setGPBaseAmountAndBalance(_ipToken, _baseToken, gp, expectAmount);
-                GPAmount = GPAmount.sub(retAmount);
-            }
-            resAmount = resAmount.sub(expectAmount);
-            totalWeight = totalWeight.sub(helpArr[i].weight);
-        }
-
-        _GPS.setCurGPAmount(_ipToken, _baseToken, GPAmount);
-        _GPS.setCurGPBalance(_ipToken, _baseToken, GPAmount);
-        amount = GPAmount;
+        amount = _GPS.computeOverRaiseAmount(_ipToken, _baseToken, _dgtToken, GPAmount, maxAmount);
         return amount;
     }
 

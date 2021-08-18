@@ -13,6 +13,7 @@ contract GPDepositLogic is BaseLogic {
     using SafeERC20 for IERC20;
 
     uint256 constant MAX_GP_NUMBER = 500;
+    uint256 constant NONZERO_INIT = 1;
 
     function GPDepositRaising(
         address _ipToken,
@@ -113,6 +114,26 @@ contract GPDepositLogic is BaseLogic {
         oriBalance = _GPS.getCurIPAmount(_ipToken, _baseToken);
         _GPS.setCurIPAmount(_ipToken, _baseToken, oriBalance.add(swappedIP));
         _GPS.allocateFunds(_ipToken, _baseToken);
+    }
+
+    function repayGPOverRaise(
+        address _ipToken,
+        address _baseToken
+    )
+        external
+        lockPool(_ipToken, _baseToken)
+    {
+        uint256 len = _GPS.getGPArrayLength(_ipToken, _baseToken);
+
+        for (uint i = len; i > 0; i--) {
+            address gp = _GPS.getGPByIndex(_ipToken, _baseToken, i - 1);
+            uint256 repayAmount = _GPS.getOverRaiseAmount(_ipToken, _baseToken, gp);
+
+            if (repayAmount > 0) {
+                IERC20(_baseToken).safeTransfer(gp, repayAmount);
+                _GPS.setOverRaiseAmount(_ipToken, _baseToken, gp, NONZERO_INIT);
+            }
+        }
     }
 
     function updateMaxIPCanRaise(

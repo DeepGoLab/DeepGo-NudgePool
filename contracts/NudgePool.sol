@@ -409,6 +409,18 @@ contract NudgePool is NPStorage, NPProxy, Pausable {
         return data.bytesToBool();
     }
 
+    function repayGPOverRaise(
+        address _ipToken,
+        address _baseToken
+    )
+        external whenNotPaused
+    {
+        (bool status, ) = curVersion.gpdc.deledatecall(
+            abi.encodeWithSelector(bytes4(keccak256(
+            "repayGPOverRaise(address,address)")), _ipToken, _baseToken));
+        require(status == true, "Repay Failed");
+    }
+
     function computeVaultReward(
         address _ipToken,
         address _baseToken

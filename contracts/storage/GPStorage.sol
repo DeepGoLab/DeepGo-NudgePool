@@ -2,13 +2,21 @@
 
 pragma solidity ^0.8.0;
 
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../lib/SafeMath.sol";
 
 contract GPStorage {
     using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     // For gas optimization
     uint256 constant NONZERO_INIT = 1;
+
+    struct GPAlloc {
+        address     gp;
+        uint256     weight;
+    }
 
     struct GPInfo {
         bool        valid;
@@ -18,6 +26,7 @@ contract GPStorage {
         uint256     runningDepositAmount;
         uint256     ipTokensAmount; // ipToken unit, include GP and LP
         uint256     raisedFromLPAmount; // baseToken unit
+        uint256     overRaiseAmount;    //baseToken repay to GP after raising end
     }
 
     struct PoolInfo {
@@ -106,11 +115,18 @@ contract GPStorage {
         pools[_ipt][_bst].GPM[_gp].baseTokensBalance = _amount;
     }
 
-    function setGPBaseAmountAndBalance(address _ipt, address _bst, address _gp, uint256 _amount) external {
+    function setGPAmount(address _ipt, address _bst, address _gp, uint256 _amount, uint256 retAmount) private {
         require(proxy == msg.sender, "Not Permit");
         require(pools[_ipt][_bst].GPM[_gp].valid == true, "GP Not Exist");
         pools[_ipt][_bst].GPM[_gp].baseTokensAmount = _amount;
         pools[_ipt][_bst].GPM[_gp].baseTokensBalance = _amount;
+        pools[_ipt][_bst].GPM[_gp].baseTokensAmount = NONZERO_INIT.add(retAmount);
+    }
+
+    function setOverRaiseAmount(address _ipt, address _bst, address _gp, uint256 _amount) external {
+        require(proxy == msg.sender, "Not Permit");
+        require(pools[_ipt][_bst].GPM[_gp].valid == true, "GP Not Exist");
+        pools[_ipt][_bst].GPM[_gp].overRaiseAmount = _amount;
     }
 
     function insertGP(address _ipt, address _bst, address _gp, uint256 _amount, bool running) external {
@@ -130,6 +146,7 @@ contract GPStorage {
 
         pools[_ipt][_bst].GPM[_gp].ipTokensAmount = NONZERO_INIT;
         pools[_ipt][_bst].GPM[_gp].raisedFromLPAmount = NONZERO_INIT;
+        pools[_ipt][_bst].GPM[_gp].overRaiseAmount = NONZERO_INIT;
         pools[_ipt][_bst].GPM[_gp].baseTokensBalance = 0;
     }
 
@@ -149,6 +166,7 @@ contract GPStorage {
         pools[_ipt][_bst].GPM[_gp].runningDepositAmount = 0;
         pools[_ipt][_bst].GPM[_gp].ipTokensAmount = 0;
         pools[_ipt][_bst].GPM[_gp].raisedFromLPAmount = 0;
+        pools[_ipt][_bst].GPM[_gp].overRaiseAmount = 0;
         pools[_ipt][_bst].GPM[_gp].baseTokensBalance = 0;
     }
 
@@ -201,6 +219,11 @@ contract GPStorage {
         return pools[_ipt][_bst].GPM[_gp].baseTokensBalance;
     }
 
+    function getOverRaiseAmount(address _ipt, address _bst, address _gp) external view returns(uint256) {
+        require(pools[_ipt][_bst].GPM[_gp].valid == true, "GP Not Exist");
+        return pools[_ipt][_bst].GPM[_gp].overRaiseAmount.sub(NONZERO_INIT);
+    }
+
     function getGPValid(address _ipt, address _bst, address _gp) external view returns(bool) {
         return pools[_ipt][_bst].GPM[_gp].valid;
     }
@@ -243,5 +266,59 @@ contract GPStorage {
             pools[_ipt][_bst].GPM[gp].ipTokensAmount = curIPAmount;
             pools[_ipt][_bst].GPM[gp].raisedFromLPAmount = curRaiseAmount;
         }
+    }
+
+    function computeOverRaiseAmount(
+        address _ipToken,
+        address _baseToken,
+        address _dgtToken,
+        uint256 gpAmount,
+        uint256 resAmount
+    )
+        external
+        returns(uint256) {
+        require(proxy == msg.sender, "Not Permit");
+
+        uint256 totalWeight = 0;
+        uint256 amount;
+        uint256 len = pools[_ipToken][_baseToken].GPA.length;
+        GPAlloc[] memory helpArr = new GPAlloc[](len);
+        for (uint256 i = 0; i < len; i++) {
+            address gp = pools[_ipToken][_baseToken].GPA[i];
+            amount = pools[_ipToken][_baseToken].GPM[gp].baseTokensAmount;
+            helpArr[i].gp = gp;
+            helpArr[i].weight = IERC20(_dgtToken).balanceOf(gp).add(1 ether).mul(amount.sqrt());
+            totalWeight = totalWeight.add(helpArr[i].weight);
+
+            for (uint256 j = i; j != 0; j--) {
+                if (helpArr[j].weight > helpArr[j-1].weight) {
+                    GPAlloc memory tmp = GPAlloc(helpArr[j].gp, helpArr[j].weight);
+                    helpArr[j].gp = helpArr[j-1].gp;
+                    helpArr[j].weight = helpArr[j-1].weight;
+                    helpArr[j-1].gp = tmp.gp;
+                    helpArr[j-1].weight = tmp.weight;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        for (uint256 i = 0; i < len; i++) {
+            address gp = helpArr[i].gp;
+            uint256 expectAmount = resAmount.mul(helpArr[i].weight).div(totalWeight);
+            amount = pools[_ipToken][_baseToken].GPM[gp].baseTokensAmount;
+            expectAmount = expectAmount > amount ? amount : expectAmount;
+            if (expectAmount < amount) {
+                uint256 retAmount = amount.sub(expectAmount);
+                setGPAmount(_ipToken, _baseToken, gp, expectAmount, retAmount);
+                gpAmount = gpAmount.sub(retAmount);
+            }
+            resAmount = resAmount.sub(expectAmount);
+            totalWeight = totalWeight.sub(helpArr[i].weight);
+        }
+
+        pools[_ipToken][_baseToken].curTotalGPAmount = gpAmount;
+        pools[_ipToken][_baseToken].curTotalBalance = gpAmount;
+        return gpAmount;
     }
 }
