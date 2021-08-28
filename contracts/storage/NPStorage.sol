@@ -7,15 +7,18 @@ import "./IPStorage.sol";
 import "./GPStorage.sol";
 import "./VaultStorage.sol";
 import "./LPStorage.sol";
+import "../lib/Safety.sol";
 
 contract NPStorage is Authority {
+    using Safety for uint256;
+
     uint256 constant RATIO_FACTOR = 1000000;
 
     uint32 public minRatio = uint32(RATIO_FACTOR * 5 / 10000);
     uint32 public alpha = 0;
     uint32 public raiseRatio = uint32(RATIO_FACTOR * 1);
     // Lowest swap boundary
-    uint32 public swapBoundaryRatio = 800000;
+    uint32 public swapBoundaryRatio = uint32(RATIO_FACTOR * 80 / 100);
 
     uint256 public auctionDuration = 7 days;
     uint256 public raisingDuration = 3 days;
@@ -51,7 +54,8 @@ contract NPStorage is Authority {
     }
 
     function setSwapBoundaryRatio(uint32 _swapBoundaryRatio) external onlyOwner {
-        require(_swapBoundaryRatio >= 800000, "Low Swap Ratio");
+        require(_swapBoundaryRatio >= RATIO_FACTOR.mul(80).div(100) &&
+                _swapBoundaryRatio <= RATIO_FACTOR, "Low Swap Ratio");
         swapBoundaryRatio = _swapBoundaryRatio;
         emit SetSwapBoundaryRatio(swapBoundaryRatio);
     }
